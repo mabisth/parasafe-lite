@@ -409,8 +409,18 @@ class ParaSafeAPITester:
         if scan_id:
             self.test_get_specific_scan(scan_id)
         
-        # Test 7: Vulnerability detection
-        self.test_vulnerability_detection()
+        # Test 7: Vulnerability detection (returns scan result for export tests)
+        vuln_scan_result = self.test_vulnerability_detection()
+        
+        # Test 8-10: Export functionality (use vulnerability scan result)
+        export_scan_result = vuln_scan_result if vuln_scan_result else scan_result
+        if export_scan_result:
+            print("🔄 Testing Export Functionality...")
+            self.test_export_pdf(export_scan_result)
+            self.test_export_word(export_scan_result)
+            self.test_export_json(export_scan_result)
+        else:
+            print("⚠️  Skipping export tests - no scan result available")
         
         # Print summary
         print("=" * 60)
