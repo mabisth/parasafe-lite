@@ -222,17 +222,161 @@ class ParaSafeAPITester:
                 if http_vuln_found:
                     self.log_test("Vulnerability Detection", True, 
                                 f"Detected {len(vulnerabilities)} vulnerabilities including HTTP issue")
-                    return True
+                    return data
                 else:
                     self.log_test("Vulnerability Detection", False, 
                                 f"Expected to find HTTP vulnerability but found: {[v.get('title') for v in vulnerabilities]}")
-                    return False
+                    return None
             else:
                 self.log_test("Vulnerability Detection", False, f"Status code: {response.status_code}")
-                return False
+                return None
                 
         except Exception as e:
             self.log_test("Vulnerability Detection", False, f"Exception: {str(e)}")
+            return None
+
+    def test_export_pdf(self, scan_result):
+        """Test PDF export functionality"""
+        if not scan_result:
+            self.log_test("Export PDF", False, "No scan result provided")
+            return False
+            
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/export/pdf",
+                json=scan_result,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                # Check content type
+                content_type = response.headers.get("content-type", "")
+                if "application/pdf" in content_type:
+                    # Check content disposition for filename
+                    content_disposition = response.headers.get("content-disposition", "")
+                    expected_filename = f"parasafe-report-{scan_result['scan_id']}.pdf"
+                    
+                    if expected_filename in content_disposition:
+                        # Check that we got actual PDF content
+                        content_length = len(response.content)
+                        if content_length > 1000:  # PDF should be substantial
+                            self.log_test("Export PDF", True, 
+                                        f"Generated PDF ({content_length} bytes) with correct filename")
+                            return True
+                        else:
+                            self.log_test("Export PDF", False, f"PDF too small: {content_length} bytes")
+                            return False
+                    else:
+                        self.log_test("Export PDF", False, f"Incorrect filename in header: {content_disposition}")
+                        return False
+                else:
+                    self.log_test("Export PDF", False, f"Wrong content type: {content_type}")
+                    return False
+            else:
+                self.log_test("Export PDF", False, f"Status code: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Export PDF", False, f"Exception: {str(e)}")
+            return False
+
+    def test_export_word(self, scan_result):
+        """Test Word export functionality"""
+        if not scan_result:
+            self.log_test("Export Word", False, "No scan result provided")
+            return False
+            
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/export/word",
+                json=scan_result,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                # Check content type
+                content_type = response.headers.get("content-type", "")
+                if "wordprocessingml" in content_type:
+                    # Check content disposition for filename
+                    content_disposition = response.headers.get("content-disposition", "")
+                    expected_filename = f"parasafe-report-{scan_result['scan_id']}.docx"
+                    
+                    if expected_filename in content_disposition:
+                        # Check that we got actual Word content
+                        content_length = len(response.content)
+                        if content_length > 1000:  # Word doc should be substantial
+                            self.log_test("Export Word", True, 
+                                        f"Generated Word doc ({content_length} bytes) with correct filename")
+                            return True
+                        else:
+                            self.log_test("Export Word", False, f"Word doc too small: {content_length} bytes")
+                            return False
+                    else:
+                        self.log_test("Export Word", False, f"Incorrect filename in header: {content_disposition}")
+                        return False
+                else:
+                    self.log_test("Export Word", False, f"Wrong content type: {content_type}")
+                    return False
+            else:
+                self.log_test("Export Word", False, f"Status code: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Export Word", False, f"Exception: {str(e)}")
+            return False
+
+    def test_export_json(self, scan_result):
+        """Test JSON export functionality"""
+        if not scan_result:
+            self.log_test("Export JSON", False, "No scan result provided")
+            return False
+            
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/export/json",
+                json=scan_result,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                # Check content disposition for filename
+                content_disposition = response.headers.get("content-disposition", "")
+                expected_filename = f"parasafe-report-{scan_result['scan_id']}.json"
+                
+                if expected_filename in content_disposition:
+                    # Parse JSON response
+                    try:
+                        json_data = response.json()
+                        
+                        # Check required fields in JSON export
+                        required_fields = ["report_type", "generated_at", "scan_data"]
+                        missing_fields = [field for field in required_fields if field not in json_data]
+                        
+                        if not missing_fields:
+                            # Check that scan_data contains original scan result
+                            scan_data = json_data.get("scan_data", {})
+                            if scan_data.get("scan_id") == scan_result["scan_id"]:
+                                self.log_test("Export JSON", True, 
+                                            f"Generated JSON export with correct structure and scan ID")
+                                return True
+                            else:
+                                self.log_test("Export JSON", False, f"Scan ID mismatch in JSON export")
+                                return False
+                        else:
+                            self.log_test("Export JSON", False, f"Missing fields in JSON: {missing_fields}")
+                            return False
+                    except json.JSONDecodeError as e:
+                        self.log_test("Export JSON", False, f"Invalid JSON response: {str(e)}")
+                        return False
+                else:
+                    self.log_test("Export JSON", False, f"Incorrect filename in header: {content_disposition}")
+                    return False
+            else:
+                self.log_test("Export JSON", False, f"Status code: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Export JSON", False, f"Exception: {str(e)}")
             return False
 
     def run_all_tests(self):
