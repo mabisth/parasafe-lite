@@ -105,9 +105,20 @@ const App = () => {
             {/* ParaSafe-Lite Logo */}
             <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg shadow-lg logo-shield">
               <div className="w-8 h-8 relative">
-                {/* Shield icon */}
-                <svg viewBox="0 0 24 24" className="w-full h-full text-white" fill="currentColor">
-                  <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.6 14.8,10V11H16V19H8V11H9.2V10C9.2,8.6 10.6,7 12,7M12,8.2C11.2,8.2 10.4,8.7 10.4,10V11H13.6V10C13.6,8.7 12.8,8.2 12,8.2Z"/>
+                {/* Custom ParaSafe shield based on your logo design */}
+                <svg viewBox="0 0 100 100" className="w-full h-full text-white" fill="none">
+                  {/* Shield outline */}
+                  <path d="M50 5 L80 20 L80 50 C80 70 65 85 50 95 C35 85 20 70 20 50 L20 20 Z" 
+                        fill="currentColor" stroke="none"/>
+                  {/* Inner shield design with checkmark */}
+                  <path d="M50 15 L70 25 L70 50 C70 65 60 75 50 82 C40 75 30 65 30 50 L30 25 Z" 
+                        fill="#ef4444" opacity="0.9"/>
+                  {/* Security checkmark */}
+                  <path d="M40 50 L47 57 L62 42" 
+                        stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  {/* Red accent stripes */}
+                  <path d="M35 35 Q50 40 65 35" stroke="#ef4444" strokeWidth="2" fill="none" opacity="0.7"/>
+                  <path d="M35 45 Q50 50 65 45" stroke="#ef4444" strokeWidth="2" fill="none" opacity="0.7"/>
                 </svg>
               </div>
             </div>
