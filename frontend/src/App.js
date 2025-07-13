@@ -6,6 +6,7 @@ const App = () => {
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState(null);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const handleScan = async () => {
     if (!url) {
@@ -40,6 +41,51 @@ const App = () => {
     }
   };
 
+  const handleExport = async (format) => {
+    if (!scanResults) return;
+
+    setExporting(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/export/${format}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(scanResults),
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      if (format === 'json') {
+        // For JSON, create a download blob
+        const jsonData = await response.json();
+        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `parasafe-report-${scanResults.scan_id}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        // For PDF and Word, handle as binary download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const extension = format === 'pdf' ? 'pdf' : 'docx';
+        a.download = `parasafe-report-${scanResults.scan_id}.${extension}`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      setError(`Export failed: ${err.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const getRiskColor = (risk) => {
     switch (risk?.toLowerCase()) {
       case 'high': return 'text-red-600 bg-red-100';
@@ -56,9 +102,14 @@ const App = () => {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-4">
-            {/* Logo Placeholder - Will be replaced with actual logo */}
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
-              <div className="w-8 h-8 bg-white rounded transform rotate-45"></div>
+            {/* ParaSafe-Lite Logo */}
+            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg shadow-lg logo-shield">
+              <div className="w-8 h-8 relative">
+                {/* Shield icon */}
+                <svg viewBox="0 0 24 24" className="w-full h-full text-white" fill="currentColor">
+                  <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.6 14.8,10V11H16V19H8V11H9.2V10C9.2,8.6 10.6,7 12,7M12,8.2C11.2,8.2 10.4,8.7 10.4,10V11H13.6V10C13.6,8.7 12.8,8.2 12,8.2Z"/>
+                </svg>
+              </div>
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">ParaSafe-Lite</h1>
@@ -114,6 +165,52 @@ const App = () => {
         {/* Scan Results */}
         {scanResults && (
           <div className="space-y-6">
+            {/* Export Options */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Report</h3>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => handleExport('pdf')}
+                  disabled={exporting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 flex items-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                  </svg>
+                  <span>Export PDF</span>
+                </button>
+                
+                <button
+                  onClick={() => handleExport('word')}
+                  disabled={exporting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                  </svg>
+                  <span>Export Word</span>
+                </button>
+                
+                <button
+                  onClick={() => handleExport('json')}
+                  disabled={exporting}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  <span>Export JSON</span>
+                </button>
+              </div>
+              
+              {exporting && (
+                <div className="mt-4 flex items-center space-x-2 text-blue-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span>Generating report...</span>
+                </div>
+              )}
+            </div>
+
             {/* Scan Summary */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Scan Summary</h3>

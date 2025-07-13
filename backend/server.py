@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, HttpUrl
 import requests
 import urllib3
@@ -17,6 +18,16 @@ import aiohttp
 import time
 from bs4 import BeautifulSoup
 import warnings
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from docx import Document
+from docx.shared import Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import tempfile
 
 # Disable SSL warnings for testing purposes
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -58,6 +69,203 @@ class ScanResult(BaseModel):
     summary: Dict[str, int]
     vulnerabilities: List[VulnerabilityReport]
     scan_info: Dict[str, Any]
+
+class ReportExporter:
+    def __init__(self):
+        pass
+
+    def generate_pdf(self, scan_result: ScanResult) -> bytes:
+        """Generate PDF report"""
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=72, bottomMargin=72)
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            alignment=1  # Center alignment
+        )
+        
+        story = []
+        
+        # Title
+        story.append(Paragraph("ParaSafe-Lite Security Report", title_style))
+        story.append(Spacer(1, 20))
+        
+        # Scan Information
+        story.append(Paragraph("Scan Information", styles['Heading2']))
+        scan_info_data = [
+            ['Target URL', scan_result.target_url],
+            ['Scan Time', scan_result.scan_time],
+            ['Scan ID', scan_result.scan_id],
+            ['Server', scan_result.scan_info.get('server_info', 'Unknown')],
+            ['Technologies', ', '.join(scan_result.scan_info.get('technologies', []))]
+        ]
+        
+        scan_info_table = Table(scan_info_data, colWidths=[2*inch, 4*inch])
+        scan_info_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(scan_info_table)
+        story.append(Spacer(1, 20))
+        
+        # Summary
+        story.append(Paragraph("Vulnerability Summary", styles['Heading2']))
+        summary_data = [
+            ['Risk Level', 'Count'],
+            ['High Risk', str(scan_result.summary.get('high', 0))],
+            ['Medium Risk', str(scan_result.summary.get('medium', 0))],
+            ['Low Risk', str(scan_result.summary.get('low', 0))],
+            ['Informational', str(scan_result.summary.get('info', 0))]
+        ]
+        
+        summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(summary_table)
+        story.append(PageBreak())
+        
+        # Vulnerabilities
+        if scan_result.vulnerabilities:
+            story.append(Paragraph("Vulnerability Details", styles['Heading2']))
+            
+            for i, vuln in enumerate(scan_result.vulnerabilities):
+                story.append(Paragraph(f"{i+1}. {vuln.title}", styles['Heading3']))
+                story.append(Paragraph(f"<b>Risk Level:</b> {vuln.risk.upper()}", styles['Normal']))
+                story.append(Paragraph(f"<b>Description:</b> {vuln.description}", styles['Normal']))
+                
+                if vuln.evidence:
+                    story.append(Paragraph(f"<b>Evidence:</b> {vuln.evidence}", styles['Normal']))
+                
+                story.append(Paragraph(f"<b>Recommendation:</b> {vuln.recommendation}", styles['Normal']))
+                story.append(Paragraph(f"<b>Manual Verification:</b> {vuln.manual_verification}", styles['Normal']))
+                
+                if vuln.owasp_category:
+                    story.append(Paragraph(f"<b>OWASP Category:</b> {vuln.owasp_category}", styles['Normal']))
+                
+                if vuln.cwe_id:
+                    story.append(Paragraph(f"<b>CWE ID:</b> {vuln.cwe_id}", styles['Normal']))
+                
+                story.append(Spacer(1, 20))
+        
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    def generate_word(self, scan_result: ScanResult) -> bytes:
+        """Generate Word document report"""
+        doc = Document()
+        
+        # Title
+        title = doc.add_heading('ParaSafe-Lite Security Report', 0)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Scan Information
+        doc.add_heading('Scan Information', level=1)
+        scan_table = doc.add_table(rows=5, cols=2)
+        scan_table.style = 'Table Grid'
+        
+        scan_data = [
+            ('Target URL', scan_result.target_url),
+            ('Scan Time', scan_result.scan_time),
+            ('Scan ID', scan_result.scan_id),
+            ('Server', scan_result.scan_info.get('server_info', 'Unknown')),
+            ('Technologies', ', '.join(scan_result.scan_info.get('technologies', [])))
+        ]
+        
+        for i, (key, value) in enumerate(scan_data):
+            scan_table.cell(i, 0).text = key
+            scan_table.cell(i, 1).text = str(value)
+        
+        # Summary
+        doc.add_heading('Vulnerability Summary', level=1)
+        summary_table = doc.add_table(rows=5, cols=2)
+        summary_table.style = 'Table Grid'
+        
+        summary_data = [
+            ('High Risk', str(scan_result.summary.get('high', 0))),
+            ('Medium Risk', str(scan_result.summary.get('medium', 0))),
+            ('Low Risk', str(scan_result.summary.get('low', 0))),
+            ('Informational', str(scan_result.summary.get('info', 0))),
+            ('Total', str(sum(scan_result.summary.values())))
+        ]
+        
+        for i, (key, value) in enumerate(summary_data):
+            summary_table.cell(i, 0).text = key
+            summary_table.cell(i, 1).text = value
+        
+        # Vulnerabilities
+        if scan_result.vulnerabilities:
+            doc.add_page_break()
+            doc.add_heading('Vulnerability Details', level=1)
+            
+            for i, vuln in enumerate(scan_result.vulnerabilities):
+                doc.add_heading(f"{i+1}. {vuln.title}", level=2)
+                
+                p = doc.add_paragraph()
+                p.add_run('Risk Level: ').bold = True
+                p.add_run(vuln.risk.upper())
+                
+                p = doc.add_paragraph()
+                p.add_run('Description: ').bold = True
+                p.add_run(vuln.description)
+                
+                if vuln.evidence:
+                    p = doc.add_paragraph()
+                    p.add_run('Evidence: ').bold = True
+                    p.add_run(vuln.evidence)
+                
+                p = doc.add_paragraph()
+                p.add_run('Recommendation: ').bold = True
+                p.add_run(vuln.recommendation)
+                
+                p = doc.add_paragraph()
+                p.add_run('Manual Verification: ').bold = True
+                p.add_run(vuln.manual_verification)
+                
+                if vuln.owasp_category:
+                    p = doc.add_paragraph()
+                    p.add_run('OWASP Category: ').bold = True
+                    p.add_run(vuln.owasp_category)
+                
+                if vuln.cwe_id:
+                    p = doc.add_paragraph()
+                    p.add_run('CWE ID: ').bold = True
+                    p.add_run(vuln.cwe_id)
+                
+                doc.add_paragraph()  # Add spacing
+        
+        # Save to bytes
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    def generate_json(self, scan_result: ScanResult) -> dict:
+        """Generate JSON report"""
+        return {
+            "report_type": "ParaSafe-Lite Security Report",
+            "generated_at": datetime.now().isoformat(),
+            "scan_data": scan_result.dict()
+        }
 
 class SecurityScanner:
     def __init__(self):
@@ -407,8 +615,9 @@ class SecurityScanner:
         
         return result
 
-# Initialize scanner
+# Initialize scanner and exporter
 scanner = SecurityScanner()
+exporter = ReportExporter()
 
 @app.post("/api/scan", response_model=ScanResult)
 async def scan_website(request: ScanRequest):
@@ -421,6 +630,50 @@ async def scan_website(request: ScanRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
+
+@app.post("/api/export/pdf")
+async def export_pdf(scan_result: dict):
+    """Export scan results as PDF"""
+    try:
+        result = ScanResult(**scan_result)
+        pdf_bytes = exporter.generate_pdf(result)
+        
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=parasafe-report-{result.scan_id}.pdf"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF export failed: {str(e)}")
+
+@app.post("/api/export/word")
+async def export_word(scan_result: dict):
+    """Export scan results as Word document"""
+    try:
+        result = ScanResult(**scan_result)
+        word_bytes = exporter.generate_word(result)
+        
+        return StreamingResponse(
+            io.BytesIO(word_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename=parasafe-report-{result.scan_id}.docx"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Word export failed: {str(e)}")
+
+@app.post("/api/export/json")
+async def export_json(scan_result: dict):
+    """Export scan results as JSON"""
+    try:
+        result = ScanResult(**scan_result)
+        json_data = exporter.generate_json(result)
+        
+        return JSONResponse(
+            content=json_data,
+            headers={"Content-Disposition": f"attachment; filename=parasafe-report-{result.scan_id}.json"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"JSON export failed: {str(e)}")
 
 @app.get("/api/scans")
 async def get_scan_history(limit: int = 10):
