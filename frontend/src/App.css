@@ -1,38 +1,133 @@
+/* Custom styles for ParaSafe-Lite */
+
 .App {
-    text-align: center;
+  text-align: center;
 }
 
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Loading spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Code blocks styling */
+code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
+/* Custom scrollbar for code blocks */
+.overflow-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Vulnerability severity indicators */
+.vulnerability-high {
+  border-left: 4px solid #ef4444;
+}
+
+.vulnerability-medium {
+  border-left: 4px solid #f97316;
+}
+
+.vulnerability-low {
+  border-left: 4px solid #eab308;
+}
+
+.vulnerability-info {
+  border-left: 4px solid #3b82f6;
+}
+
+/* Scan results animation */
+.scan-results-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.scan-results-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 300ms ease-in-out;
+}
+
+/* Progress indicators */
+.scan-progress {
+  background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+  height: 4px;
+  border-radius: 2px;
+  animation: progress 2s ease-in-out infinite;
+}
+
+@keyframes progress {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
+}
+
+/* Security badge styles */
+.security-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Logo animation */
+.logo-shield {
+  transition: transform 0.2s ease-in-out;
+}
+
+.logo-shield:hover {
+  transform: scale(1.05);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .scan-input-container {
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+    gap: 1rem;
+  }
+  
+  .scan-input-container button {
+    width: 100%;
+  }
 }
 
-.App-link {
-    color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dark-mode {
+    background-color: #1f2937;
+    color: #f9fafb;
+  }
+  
+  .dark-mode .bg-white {
+    background-color: #374151;
+  }
+  
+  .dark-mode .text-gray-900 {
+    color: #f9fafb;
+  }
+  
+  .dark-mode .border-gray-200 {
+    border-color: #4b5563;
+  }
 }
